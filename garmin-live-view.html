@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Real-time Garmin Distance</title>
+</head>
+<body>
+	<h1>Real-time Garmin Distance</h1>
+
+	<p>Enter the start and end times for the event, the update interval, the number of accounts to fetch data for, and the access tokens:</p>
+
+	<form id="settings">
+		<label for="start-time">Start Time:</label>
+		<input type="datetime-local" id="start-time" name="start-time"><br>
+
+		<label for="end-time">End Time:</label>
+		<input type="datetime-local" id="end-time" name="end-time"><br>
+
+		<label for="interval">Update Interval (seconds):</label>
+		<input type="number" id="interval" name="interval" min="1" max="60" value="1"><br>
+
+		<label for="num-accounts">Number of Accounts:</label>
+		<input type="number" id="num-accounts" name="num-accounts" min="1" max="5" value="1"><br>
+
+		<label for="access-tokens">Access Tokens:</label>
+		<textarea id="access-tokens" name="access-tokens" rows="5" cols="50"></textarea><br>
+
+		<input type="button" value="Start" onclick="startUpdates()">
+		<input type="button" value="Stop" onclick="stopUpdates()">
+	</form>
+
+	<div id="data"></div>
+
+	<script>
+		let intervalId;
+		let startTimestamp;
+		let endTimestamp;
+
+		function startUpdates() {
+			const startTime = document.getElementById("start-time").value;
+			const endTime = document.getElementById("end-time").value;
+			const interval = document.getElementById("interval").value;
+			const numAccounts = document.getElementById("num-accounts").value;
+			const accessTokens = document.getElementById("access-tokens").value.split("\n").slice(0, numAccounts);
+
+			if (!startTime || !endTime || !accessTokens) {
+				alert("Please enter start and end times, and access tokens for all accounts");
+				return;
+			}
+
+			startTimestamp = new Date(startTime).getTime() / 1000;
+			endTimestamp = new Date(endTime).getTime() / 1000;
+
+			if (startTimestamp >= endTimestamp) {
+				alert("End time must be after start time");
+				return;
+			}
+
+			intervalId = setInterval(() => {
+				let totalDistance = 0;
+				let data = "";
+
+				for (let i = 0; i < accessTokens.length; i++) {
+					const headers = {'Authorization': 'Bearer ' + accessTokens[i]};
+					const apiUrl = `https://connect.garmin.com/modern/proxy/userstats-service/statistics/daily/${startTimestamp}/${endTimestamp}/distance`;
+
+					fetch(apiUrl, { headers })
+						.then(response => response.json())
+						.then(json => {
+							let individualDistance = 0;
+
+							for (let j = 0; j < json.userMetrics[0].metrics.length; j++) {
+								individualDistance += json.userMetrics[0].metrics[j].value;
+							}
+
+							totalDistance += individualDistance;
+
+							data += `Account ${i+1}: Distance: ${Math.round(individualDistance/1000, 2)} km<br>`;
+						})
+						.catch(error => {
+							console.error(error);
+							data += `Account ${i+1}: Error fetching data<br>`;
+						});
+				}
+
+			
